@@ -41,12 +41,30 @@ def add_or_update_user(username: str, password: str, role: str = "operator") -> 
 
 
 def _verify_credentials(username: str, password: str) -> dict | None:
+    # Check credentials stored in Streamlit Cloud Secrets
+    try:
+        cloud_users = st.secrets.get("users", {})
+        cloud_user = cloud_users.get(username)
+
+        if cloud_user and secrets.compare_digest(
+            password, str(cloud_user.get("password", ""))
+        ):
+            return {
+                "role": cloud_user.get("role", "operator"),
+                "display_name": cloud_user.get(
+                    "display_name", username.capitalize()
+                ),
+            }
+    except Exception:
+        pass
+
+    # Check local users.json
     users = _load_users()
     user = users.get(username)
-    if not user:
-        return None
-    if _hash_password(password, user["salt"]) == user["password_hash"]:
+
+    if user and _hash_password(password, user["salt"]) == user["password_hash"]:
         return user
+
     return None
 
 
